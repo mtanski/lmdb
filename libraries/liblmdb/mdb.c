@@ -1493,6 +1493,35 @@ mdb_page_malloc(MDB_txn *txn, unsigned num)
 	}
 	return ret;
 }
+
+static
+int mdb_plist_hole(MDB_env *env, MDB_IDL free_pages)
+{
+/* fallocate and it's corresponding macros need glibc 2.18+ */
+#if defined(__GLIBC_PREREQ)
+#if __GLIBC_PREREQ(2,18)
+	const int mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
+	unsigned int i, count;
+	int rc;
+
+	if (!(env->me_flags & MDB_FRHOLE))
+		return 0;
+
+	count = free_pages[0];
+	for (i = 1; i <= count; i++) {
+		off_t len = env->me_psize;
+		off_t offset = free_pages[i] * env->me_psize;
+		if ((rc = fallocate(env->me_fd, mode, offset, len) != 0)) {
+			DPRINTF(("Punch hole error error: %s", strerror(rc)));
+			return rc;
+		}
+	}
+#endif
+#endif
+
+	return 0;
+}
+
 /** Free a single page.
  * Saves single pages to a list, for future reuse.
  * (This is not used for multi-page overflow pages.)
@@ -2807,6 +2836,7 @@ mdb_freelist_save(MDB_txn *txn)
 				free_pgs = txn->mt_free_pgs;
 			} while (freecnt < free_pgs[0]);
 			mdb_midl_sort(free_pgs);
+			mdb_plist_hole(env, free_pgs);
 			memcpy(data.mv_data, free_pgs, data.mv_size);
 #if (MDB_DEBUG) > 1
 			{

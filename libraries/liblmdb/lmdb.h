@@ -287,6 +287,10 @@ typedef void (MDB_rel_func)(MDB_val *item, void *oldptr, void *newptr, void *rel
 #define MDB_NORDAHEAD	0x800000
 	/** don't initialize malloc'd memory before writing to datafile */
 #define MDB_NOMEMINIT	0x1000000
+	/** free space on disk by punching holes in the file */
+#define MDB_FRHOLE	0x2000000
+
+
 /** @} */
 
 /**	@defgroup	mdb_dbi_open	Database Flags
